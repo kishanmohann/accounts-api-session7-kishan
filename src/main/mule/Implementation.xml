@@ -11,7 +11,6 @@ http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mu
 		<http:listener-connection host="0.0.0.0" port="8082" />
 	</http:listener-config>
 	<flow name="AccountCreationFlow" doc:id="aeeeef9d-9112-4778-8c6f-42c6481aa59b" >
-		<http:listener doc:name="Create Account" doc:id="38fe73b9-a341-414e-8ff0-fb2e7a3d4a02" config-ref="HTTP_Listener_config" path="/create" allowedMethods="POST"/>
 		<logger level="INFO" doc:name="Request logger" doc:id="4f52a799-fb84-42d6-abb8-69308e72a2f6" message="Request to create a new account #[payload] received at #[now()]"/>
 		<db:insert doc:name="Create Account" doc:id="7e679cfe-28d5-4f83-9776-fc350bc8c237" config-ref="Database_Config">
 			<db:sql ><![CDATA[INSERT INTO account (name,phone,balance,billingcity)
@@ -36,7 +35,6 @@ output application/json
 		</ee:transform>
 	</flow>
 	<flow name="GetAccounts" doc:id="d211e9eb-465e-4ad5-a776-74d72f3a6b47" >
-		<http:listener doc:name="Listener" doc:id="a81a2d21-282a-4f4a-a527-a9226b93d322" config-ref="HTTP_Listener_config" path="/get" allowedMethods="GET"/>
 		<logger level="INFO" doc:name="Get Request Logger" doc:id="440ca605-4ec0-4afc-a33c-33a2a1c8602e" message="Request to get all accounts received at #[now()]"/>
 		<db:select doc:name="Get records" doc:id="83cc979e-9953-4036-90e3-611824e83374" config-ref="Database_Config">
 			<db:sql ><![CDATA[SELECT * FROM account]]></db:sql>
@@ -73,7 +71,6 @@ output application/json
 		</choice>
 	</flow>
 	<flow name="GetrecordsbyID" doc:id="32ffceb2-4ae2-45e8-bfdf-c9cbd25c3bc0" >
-		<http:listener doc:name="Listener" doc:id="0294dfcb-7837-470f-85e9-a01e52551b7c" allowedMethods="GET" config-ref="HTTP_Listener_config" path="/account/{accID}"/>
 		<logger level="INFO" doc:name="Logger" doc:id="161aa040-11fb-4c8a-91d6-0c428ac1c544" message="Request to get account #[attributes.uriParams] received at #[now()]"/>
 		<db:select doc:name="Select" doc:id="159363a9-f899-45d3-93d2-92bc88f5f736" config-ref="Database_Config">
 			<db:sql ><![CDATA[SELECT * FROM account WHERE idaccount = :accID]]></db:sql>
