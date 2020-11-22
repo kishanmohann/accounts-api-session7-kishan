@@ -1,0 +1,150 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce" xmlns:db="http://www.mulesoft.org/schema/mule/db"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd">
+	<http:listener-config name="HTTP_Listener_config" doc:name="HTTP Listener config" doc:id="1e1aa674-43c7-44cc-aeab-e0f7e728d02d" >
+		<http:listener-connection host="0.0.0.0" port="8082" />
+	</http:listener-config>
+	<flow name="AccountCreationFlow" doc:id="aeeeef9d-9112-4778-8c6f-42c6481aa59b" >
+		<http:listener doc:name="Create Account" doc:id="38fe73b9-a341-414e-8ff0-fb2e7a3d4a02" config-ref="HTTP_Listener_config" path="/create" allowedMethods="POST"/>
+		<logger level="INFO" doc:name="Request logger" doc:id="4f52a799-fb84-42d6-abb8-69308e72a2f6" message="Request to create a new account #[payload] received at #[now()]"/>
+		<db:insert doc:name="Create Account" doc:id="7e679cfe-28d5-4f83-9776-fc350bc8c237" config-ref="Database_Config">
+			<db:sql ><![CDATA[INSERT INTO account (name,phone,balance,billingcity)
+values(:name,:phone,:balance,:billingcity)]]></db:sql>
+			<db:input-parameters ><![CDATA[#[{
+	name : payload.name,
+	phone : payload.phone as String,
+	balance : payload.deposit as String,
+	billingcity : payload.billingCity
+}]]]></db:input-parameters>
+		</db:insert>
+		<logger level="INFO" doc:name="Response  Logger" doc:id="85519bea-6878-4405-a759-1b92600fcf3a" message="account #[payload] created at #[now()]"/>
+		<ee:transform doc:name="Response to end user" doc:id="daa7bda8-25c7-4130-8b79-f3247bf386e7" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"message" : "Account created successfully"
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</flow>
+	<flow name="GetAccounts" doc:id="d211e9eb-465e-4ad5-a776-74d72f3a6b47" >
+		<http:listener doc:name="Listener" doc:id="a81a2d21-282a-4f4a-a527-a9226b93d322" config-ref="HTTP_Listener_config" path="/get" allowedMethods="GET"/>
+		<logger level="INFO" doc:name="Get Request Logger" doc:id="440ca605-4ec0-4afc-a33c-33a2a1c8602e" message="Request to get all accounts received at #[now()]"/>
+		<db:select doc:name="Get records" doc:id="83cc979e-9953-4036-90e3-611824e83374" config-ref="Database_Config">
+			<db:sql ><![CDATA[SELECT * FROM account]]></db:sql>
+		</db:select>
+		<choice doc:name="Size check" doc:id="5c2f3e2a-e16a-4b32-8657-bc634ae2f201" >
+			<when expression="#[sizeOf(payload) &gt; 0]">
+				<ee:transform doc:name="Transform Message" doc:id="a247162a-cddb-4589-8c9b-bcc00ff23f2d">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+payload map{
+	"Account ID" : $.idaccount,
+	"name" : $.name,
+	"phone" : $.phone,
+	"balance" : $.balance,
+	"billing city": $.billingcity
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+			</when>
+			<otherwise >
+				<ee:transform doc:name="Transform Message" doc:id="1a6ab47f-ddf8-4681-9e9b-f1d2f4f26074" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"message" : "No records found"
+}]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+			</otherwise>
+		</choice>
+	</flow>
+	<flow name="GetrecordsbyID" doc:id="32ffceb2-4ae2-45e8-bfdf-c9cbd25c3bc0" >
+		<http:listener doc:name="Listener" doc:id="0294dfcb-7837-470f-85e9-a01e52551b7c" allowedMethods="GET" config-ref="HTTP_Listener_config" path="/account/{accID}"/>
+		<logger level="INFO" doc:name="Logger" doc:id="161aa040-11fb-4c8a-91d6-0c428ac1c544" message="Request to get account #[attributes.uriParams] received at #[now()]"/>
+		<db:select doc:name="Select" doc:id="159363a9-f899-45d3-93d2-92bc88f5f736" config-ref="Database_Config">
+			<db:sql ><![CDATA[SELECT * FROM account WHERE idaccount = :accID]]></db:sql>
+			<db:input-parameters ><![CDATA[#[{
+	"accID" : attributes.uriParams.accID
+}]]]></db:input-parameters>
+		</db:select>
+		<ee:transform doc:name="Transform Message" doc:id="d1b65430-053f-45e8-97fd-f515f029ea4b" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload map{
+	"Account ID" : $.idaccount,
+	"name" : $.name,
+	"phone" : $.phone,
+	"balance" : $.balance,
+	"billing city": $.billingcity
+}	]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger level="INFO" doc:name="Logger" doc:id="480b5ad5-4163-4545-8d30-d30d8b62c6e4" message="Request to get account #[attributes.uriParams] was completed at #[now()]"/>
+	</flow>
+	<flow name="updateRecords" doc:id="76c02133-cca1-48be-8899-d5a012abfb33" >
+		<http:listener doc:name="Listener" doc:id="c18fb07b-d497-42bf-b847-c3e48302bead" allowedMethods="PATCH" config-ref="HTTP_Listener_config" path="/update/{accID}"/>
+		<logger level="INFO" doc:name="Logger" doc:id="b701a0aa-e312-40bb-b606-8db149771895" message="Request to update account #[payload] received at #[now()]"/>
+		<ee:transform doc:name="Transform Message" doc:id="2b651094-ce59-458b-9d13-b00f26e5aedf">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/java 
+---
+
+"UPDATE account SET "++ ((payload mapObject {($$): $ default ""}
+	pluck (($$)++' ='++ "'" ++($)++ "'")
+) joinBy "," ++" WHERE "++" idaccount = "++(attributes.uriParams.accID as String))]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<db:update doc:name="Update" doc:id="522594bd-7675-4a2c-a6c6-d2eb58dc8718" config-ref="Database_Config">
+			<db:sql ><![CDATA[#[payload]]]></db:sql>
+		</db:update>
+		<logger level="INFO" doc:name="Logger" doc:id="8cd3c859-9c8d-4614-8ba3-3ac19b0c19a3" message="Request to update account #[payload] completed at #[now()]"/>
+		<ee:transform doc:name="Transform Message" doc:id="29fc4e47-42f9-4736-a2a7-aeeeddb6c7f1" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"message" : "Account updated successfully"
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</flow>
+	<flow name="DeleteAccount" doc:id="fccbc5fc-a23c-42c3-b534-d28170cc438b" >
+		<http:listener doc:name="Listener" doc:id="a341ec9b-7a99-4ed3-b023-881aa190f6c0" config-ref="HTTP_Listener_config" path="/delete/{accID}" allowedMethods="DELETE"/>
+		<logger level="INFO" doc:name="Delete Request Logged" doc:id="0958aa06-c2a5-4d8c-ad54-4acaf6955739" message="Request received to delete #[attributes.uriParams.accID] at #[now()]"/>
+		<db:delete doc:name="Delete" doc:id="2676ca25-2712-4ed1-8309-10162768d816" config-ref="Database_Config">
+			<db:sql ><![CDATA[DELETE FROM account where idaccount=:accID]]></db:sql>
+			<db:input-parameters ><![CDATA[#[{
+	"accID" : attributes.uriParams.accID
+}]]]></db:input-parameters>
+		</db:delete>
+		<logger level="INFO" doc:name="Logger" doc:id="36c23557-c2f8-4074-92b7-1673706a9d18" message="Request to delete #[attributes.uriParams.accID] is now completed at #[now()]"/>
+		<ee:transform doc:name="Transform Message" doc:id="bb329ac8-b84c-494e-a5ca-1c74a42257e9" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"message" : "Account delete successfully"
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</flow>
+</mule>

@@ -1,0 +1,143 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:file="http://www.mulesoft.org/schema/mule/file" xmlns:s3="http://www.mulesoft.org/schema/mule/s3"
+	xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd
+http://www.mulesoft.org/schema/mule/s3 http://www.mulesoft.org/schema/mule/s3/current/mule-s3.xsd
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd">
+	<sub-flow name="SFDCcall" doc:id="7b81605f-9658-416c-a74c-42a1f58c2f65" >
+		<ee:transform doc:name="PrepareSFDCinput" doc:id="d3a36ee9-b845-45b3-9c20-6dab17e4713a">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/java
+---
+payload map ( payload01 , indexOfPayload01 ) -> {
+	Name: payload01.name,
+	BillingCity: payload01.billingcity,
+	Phone: payload01.phone
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<salesforce:create doc:name="createSFDCAccount" doc:id="3edbac1d-15e5-4636-b3c5-c8b17118227a" type="account" config-ref="Salesforce_Config" />
+		<ee:transform doc:name="Transform Message" doc:id="0ccf7933-afd8-43f9-bf8c-5dceea437739" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</sub-flow>
+	<flow name="ReportFlow" doc:id="c5b0dcc4-092a-4923-90de-403e2b4f9083" >
+		<http:listener doc:name="Copy_of_Listener" doc:id="c9b05c74-965b-47e8-a5d4-bcc71a0138d3" config-ref="HTTP_Listener_config" path="/sfdc" />
+		<set-variable value="#[attributes.queryParams.system]" doc:name="Set Variable" doc:id="9a9df916-6f0a-4bd8-963a-0063ad9fc082" variableName="system"/>
+		<set-variable value="#[attributes.queryParams.accId]" doc:name="Set Variable" doc:id="4750a183-23d6-42a8-a3a2-8f0241914968" variableName="accId"/>
+		<logger level="INFO" doc:name="RequestLogger" doc:id="7cb1d527-700c-4dfc-bf25-f30ca6fb074b" message="Request received for report #[vars.accId] to #[vars.system] at #[now()]" />
+		<db:select doc:name="Retreiverecordsfromdb" doc:id="68653d25-f550-400b-b74b-0bca6486e6c7" config-ref="Database_Config" >
+			<db:sql ><![CDATA[SELECT name,phone,billingcity from account
+WHERE idaccount =:acc]]></db:sql>
+			<db:input-parameters ><![CDATA[#[{
+	"acc" : attributes.queryParams.accId
+}]]]></db:input-parameters>
+		</db:select>
+		<choice doc:name="Choice" doc:id="f94a8d30-fa33-4084-b498-9c676f74dd47" >
+			<when expression="#[vars.system == 'SFDC' and sizeOf(payload) &gt; 0]">
+				<flow-ref doc:name="Flow Reference" doc:id="c5cedadb-3c53-4bb9-8d47-95be880caaa4" name="SFDCcall" />
+			</when>
+			<when expression="#[vars.system == 'AWS' and sizeOf(payload) &gt; 0]">
+				<flow-ref doc:name="Flow Reference" doc:id="471238f5-9878-4783-b77e-80c6e46e5544" name="AWSFlow"/>
+			</when>
+			<when expression="#[vars.system == 'FILE' and sizeOf(payload) &gt; 0]">
+				<flow-ref doc:name="Flow Reference" doc:id="b3b7aa20-effe-40fd-b1e6-8f5c76df8bee" name="fileFlow"/>
+			</when>
+			<when expression="#[sizeOf(payload) == 0]">
+				<ee:transform doc:name="Transform Message" doc:id="806e2c0c-7fac-417a-8a75-97f9c151ec3e" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"message" : "No records found"
+}]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+			</when>
+			<otherwise >
+				<scatter-gather doc:name="Scatter-Gather" doc:id="95becfcf-ac0c-42ed-9a8e-48c21c9c2f3a" >
+					<route >
+						<flow-ref doc:name="Flow Reference" doc:id="456f2548-c809-4eb8-a365-984d583578e5" name="SFDCcall"/>
+					</route>
+					<route >
+						<flow-ref doc:name="Flow Reference" doc:id="03d11398-327a-499e-8f16-b3beaab2f305" name="AWSFlow"/>
+					</route>
+					<route >
+						<flow-ref doc:name="Flow Reference" doc:id="3f392f34-dc4c-495c-ab94-35cc20090fcf" name="fileFlow"/>
+					</route>
+				</scatter-gather>
+				<ee:transform doc:name="Transform Message" doc:id="a3e4b6fc-0bf9-4d69-bd32-bc6ac9a17362" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+flatten(payload..payload)]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+			</otherwise>
+		</choice>
+		<logger level="INFO" doc:name="Request completion" doc:id="07d8e61d-f6bb-40d7-9837-f7d3d5d6390d" message="Request completed for report #[vars.accId] to #[vars.system] at #[now()]"/>
+	</flow>
+	<flow name="AWSFlow" doc:id="99851621-98dc-4a3a-a594-5cd5c667061e" >
+		<ee:transform doc:name="Transform Message" doc:id="e9cd7714-2ebd-40bc-af11-53aabea892a8" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload default ""]]></ee:set-payload>
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="filename" ><![CDATA[%dw 2.0
+output application/java
+---
+payload[0].name ++ ".txt"]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<s3:create-object doc:name="Create object" doc:id="b923c56e-1667-4da8-8253-1eeb778d2c3d" config-ref="Amazon_S3_Configuration" bucketName="#['kishan27']" key="#[vars.filename]"/>
+		<ee:transform doc:name="Transform Message" doc:id="b96b7292-a652-479a-9996-bf18130bfc15" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</flow>
+	<flow name="fileFlow" doc:id="dfde55c1-02e9-4905-8da0-a56d0215619a" >
+		<ee:transform doc:name="Transform Message" doc:id="e3b70b22-0e31-403c-9e2e-73dfea19ccc2" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="localfilename" ><![CDATA[%dw 2.0
+output application/java
+---
+(payload[0].name default "")++ ".txt"]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<file:write doc:name="Write" doc:id="e7aa8042-f699-4e0f-8999-7848a85549b5" path="#[Mule::p('file.path') as String ++ vars.localfilename]"/>
+		<ee:transform doc:name="Transform Message" doc:id="da2de039-0541-425b-a184-579b14cc4fd3" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</flow>
+</mule>

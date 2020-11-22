@@ -1,0 +1,20 @@
+db:
+  host : ""
+  port : "3306"
+  username : ""
+  password : ""
+  dbinstance : ""
+  
+sfdc: 
+  username : ""
+  password : ""
+  token : ""
+  
+aws: 
+  username: ""
+  passowrd: ""
+  access : ""
+  secrets : ""
+  
+file:
+  path : ""
