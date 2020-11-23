@@ -124,7 +124,7 @@ output application/json
         </error-handler>
     </flow>
     <flow name="delete:\account\(accID):accounts-api-config">
-		<flow-ref doc:name="Flow Reference" doc:id="31aa3fa8-9648-4a0d-8280-4f8cd301afee" name="delete:\account\(accID):accounts-api-config"/>
+		<flow-ref doc:name="Flow Reference" doc:id="31aa3fa8-9648-4a0d-8280-4f8cd301afee" name="DeleteAccount"/>
     </flow>
     <flow name="patch:\account\(accID):application\json:accounts-api-config">
 		<flow-ref doc:name="Flow Reference" doc:id="08430249-7d07-4976-8f6b-e3c74e28131f" name="updateRecords"/>

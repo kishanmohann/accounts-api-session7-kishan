@@ -95,7 +95,6 @@ payload map{
 		<logger level="INFO" doc:name="Logger" doc:id="480b5ad5-4163-4545-8d30-d30d8b62c6e4" message="Request to get account #[attributes.uriParams] was completed at #[now()]"/>
 	</flow>
 	<flow name="updateRecords" doc:id="76c02133-cca1-48be-8899-d5a012abfb33" >
-		<http:listener doc:name="Listener" doc:id="c18fb07b-d497-42bf-b847-c3e48302bead" allowedMethods="PATCH" config-ref="HTTP_Listener_config" path="/update/{accID}"/>
 		<logger level="INFO" doc:name="Logger" doc:id="b701a0aa-e312-40bb-b606-8db149771895" message="Request to update account #[payload] received at #[now()]"/>
 		<ee:transform doc:name="Transform Message" doc:id="2b651094-ce59-458b-9d13-b00f26e5aedf">
 			<ee:message>
@@ -124,7 +123,6 @@ output application/json
 		</ee:transform>
 	</flow>
 	<flow name="DeleteAccount" doc:id="fccbc5fc-a23c-42c3-b534-d28170cc438b" >
-		<http:listener doc:name="Listener" doc:id="a341ec9b-7a99-4ed3-b023-881aa190f6c0" config-ref="HTTP_Listener_config" path="/delete/{accID}" allowedMethods="DELETE"/>
 		<logger level="INFO" doc:name="Delete Request Logged" doc:id="0958aa06-c2a5-4d8c-ad54-4acaf6955739" message="Request received to delete #[attributes.uriParams.accID] at #[now()]"/>
 		<db:delete doc:name="Delete" doc:id="2676ca25-2712-4ed1-8309-10162768d816" config-ref="Database_Config">
 			<db:sql ><![CDATA[DELETE FROM account where idaccount=:accID]]></db:sql>
